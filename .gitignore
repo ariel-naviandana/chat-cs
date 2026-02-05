@@ -37,4 +37,4 @@ logs/
 tmp/
 temp/
 
-auth-info/
+auth_info/
