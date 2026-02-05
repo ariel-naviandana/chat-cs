@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CS Chat Test - Mirip WhatsApp Web</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #e5ddd5;
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: #075e54;
+      color: white;
+      padding: 10px 15px;
+      display: flex;
+      flex-direction: column;
+    }
+    .header-title {
+      font-weight: bold;
+      font-size: 18px;
+    }
+    .header-status {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+    .chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 5px;
+      background: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png') repeat;
+      background-size: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    .message {
+      max-width: 70%;
+      margin: 6px 10px;
+      padding: 8px 12px;
+      border-radius: 7.5px;
+      position: relative;
+      word-wrap: break-word;
+      font-size: 14.2px;
+      line-height: 19px;
+    }
+    .sent {
+      background: #dcf8c6;
+      align-self: flex-end;
+      margin-left: auto;
+    }
+    .received {
+      background: white;
+      align-self: flex-start;
+    }
+    .status {
+      font-size: 11px;
+      color: #667781;
+      margin-top: 3px;
+      text-align: right;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    .tick {
+      margin-left: 4px;
+      font-size: 11px;
+    }
+    .tick-sent { color: #667781; }
+    .tick-delivered { color: #53bdeb; }
+    .tick-read { color: #4fc3f7; }
+    .input-area {
+      background: #f0f0f0;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      border-top: 1px solid #ddd;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 12px 15px;
+      border: none;
+      border-radius: 25px;
+      margin: 0 8px;
+      font-size: 15px;
+    }
+    button {
+      background: #075e54;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 25px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    #typingStatus {
+      font-size: 13px;
+      color: #555;
+      padding: 5px 15px;
+      background: rgba(255,255,255,0.8);
+      border-radius: 10px;
+      align-self: center;
+      margin: 5px 0;
+      min-height: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-title">Customer Service Test</div>
+    <div class="header-status" id="presenceStatus">Menunggu status...</div>
+  </header>
+
+  <div class="chat-container" id="chatContainer">
+    <div id="typingStatus"></div>
+  </div>
+
+  <div class="input-area">
+    <input id="chatId" placeholder="Chat ID (628xxx@s.whatsapp.net)" value="6289617349913@s.whatsapp.net">
+    <input id="text" placeholder="Ketik pesan..." autocomplete="off">
+    <button onclick="kirimPesan()">Kirim</button>
+  </div>
+
+  <script>
+    const socket = io('http://localhost:3000', {
+      path: '/socket.io/',
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      timeout: 10000
+    });
+
+    const chatContainer = document.getElementById('chatContainer');
+    const typingStatus = document.getElementById('typingStatus');
+    const presenceStatus = document.getElementById('presenceStatus');
+    const textInput = document.getElementById('text');
+    const chatIdInput = document.getElementById('chatId');
+
+    const sentMessages = new Set(); // Hindari duplikat pesan
+
+    textInput.focus();
+
+    // Kirim dengan Enter
+    textInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        kirimPesan();
+      }
+    });
+
+    socket.on('connect', () => {
+      presenceStatus.innerHTML = 'Terhubung ke server';
+      console.log('Connected:', socket.id);
+    });
+
+    socket.on('connect_error', (err) => {
+      presenceStatus.innerHTML = 'Gagal terhubung: ' + err.message;
+      console.error('Connect error:', err);
+    });
+
+    // Pesan baru (baik kirim sendiri atau dari customer)
+    socket.on('newMessage', (msg) => {
+      if (sentMessages.has(msg.id)) {
+        // Update status kalau pesan yang kita kirim kembali dari server
+        updateStatusBubble(msg.id, msg.status);
+        return;
+      }
+
+      tambahPesanKeUI(msg);
+      sentMessages.add(msg.id);
+      scrollKeBawah();
+    });
+
+    // Typing
+    socket.on('typing', (data) => {
+      typingStatus.innerHTML = data.isTyping ? 'Sedang mengetik...' : '';
+    });
+
+    // Presence (online / last seen)
+    socket.on('presence', (data) => {
+      let text = data.isOnline ? 'Online' : 'Offline';
+      if (!data.isOnline && data.lastSeen) {
+        text += ` • Terakhir dilihat: ${new Date(data.lastSeen).toLocaleString('id-ID')}`;
+      }
+      presenceStatus.innerHTML = text;
+    });
+
+    // Update centang
+    socket.on('receipt', (data) => {
+      updateStatusBubble(data.messageId, data.status);
+    });
+
+    function kirimPesan() {
+      const chatId = chatIdInput.value.trim();
+      const text = textInput.value.trim();
+
+      if (!chatId || !text) return alert('Isi chatId dan pesan!');
+
+      const msg = { chatId, text, id: 'temp-' + Date.now() }; // temp ID untuk optimis UI
+      socket.emit('sendMessage', { chatId, text });
+
+      tambahPesanKeUI({
+        id: msg.id,
+        chatId,
+        from: 'agent',
+        text,
+        status: 'sent',
+        timestamp: new Date()
+      });
+
+      sentMessages.add(msg.id);
+      textInput.value = '';
+      textInput.focus();
+      scrollKeBawah();
+    }
+
+    function tambahPesanKeUI(msg) {
+      const isSent = msg.from === 'agent';
+      const bubble = document.createElement('div');
+      bubble.className = `message ${isSent ? 'sent' : 'received'}`;
+      bubble.setAttribute('data-id', msg.id);
+
+      let statusHtml = '';
+      if (isSent) {
+        let tickClass = '';
+        if (msg.status === 'sent') tickClass = 'tick-sent';
+        else if (msg.status === 'delivered') tickClass = 'tick-delivered';
+        else if (msg.status === 'read') tickClass = 'tick-read';
+
+        statusHtml = `
+          <div class="status">
+            ${new Date(msg.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+            <span class="tick ${tickClass}"></span>
+          </div>
+        `;
+      } else {
+        statusHtml = `
+          <div class="status">
+            ${new Date(msg.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+        `;
+      }
+
+      bubble.innerHTML = `
+        ${msg.text || '[Pesan lain]'}
+        ${statusHtml}
+      `;
+
+      chatContainer.appendChild(bubble);
+    }
+
+    function updateStatusBubble(messageId, status) {
+      const bubble = document.querySelector(`[data-id="${messageId}"]`);
+      if (bubble) {
+        const statusEl = bubble.querySelector('.status .tick');
+        if (statusEl) {
+          statusEl.className = 'tick';
+          if (status === 'delivered') statusEl.classList.add('tick-delivered');
+          else if (status === 'read') statusEl.classList.add('tick-read');
+        }
+      }
+    }
+
+    function scrollKeBawah() {
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+  </script>
+</body>
+</html>

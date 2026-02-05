@@ -1,0 +1,33 @@
+{
+  "name": "chat-cs-app",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/mongoose": "^5.11.96",
+    "@types/node": "^25.2.0",
+    "@types/pino": "^7.0.4",
+    "@types/qrcode-terminal": "^0.12.2",
+    "@types/socket.io": "^3.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.1.6",
+    "pino": "^10.3.0",
+    "qrcode-terminal": "^0.12.0",
+    "socket.io": "^4.8.3"
+  }
+}
