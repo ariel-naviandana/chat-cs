@@ -36,3 +36,5 @@ logs/
 .cache/
 tmp/
 temp/
+
+auth-info/
