@@ -128,8 +128,8 @@
   </div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script>
-    // Konfigurasi socket
     const socket = io('http://localhost:3000', {
       path: '/socket.io/',
       transports: ['polling','websocket'],
@@ -137,7 +137,6 @@
       timeout: 10000
     });
 
-    // DOM
     const chatContainer = document.getElementById('chatContainer');
     const typingStatus = document.getElementById('typingStatus');
     const presenceStatus = document.getElementById('presenceStatus');
@@ -145,18 +144,14 @@
     const chatIdInput = document.getElementById('chatId');
     const sendBtn = document.getElementById('sendBtn');
 
-    // State lokal untuk deduplikasi & mapping temp->real
-    const sentMessages = new Set(); // menyimpan real message ids yang sudah ditampilkan
-    const tempToReal = new Map();   // tempId -> realId (jika sudah ack)
-    const realToTemp = new Map();   // realId -> tempId (opsional, untuk update bubble)
+    // Tracking yang lebih ketat
+    const displayedMessageIds = new Set();  // REAL message IDs yang sudah ditampilkan
+    const pendingTempIds = new Map();       // tempId -> { promise, resolve, reject }
 
-    // Utility kecil untuk debugging
     function log(...args){ console.debug('[client]', ...args) }
 
-    // Fokus input
     textInput.focus();
 
-    // Enter to send
     textInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); kirimPesan(); }
     });
@@ -166,74 +161,126 @@
       presenceStatus.innerHTML = 'Terhubung ke server';
       log('connected', socket.id);
     });
+
     socket.on('connect_error', (err) => {
       presenceStatus.innerHTML = 'Gagal terhubung: ' + (err?.message || err);
       console.error('connect_error', err);
     });
 
-    // Handler: ACK dari server -> ganti temp bubble jadi real id
-    socket.on('messageAck', (data) => {
-      log('messageAck', data);
+        socket.on('messageAck', (data) => {
+      log('📨 messageAck EVENT DITERIMA:', data);
       const { tempId, message } = data || {};
-      if (!tempId || !message || !message.id) return;
+      
+      if (!tempId || !message || !message.id) {
+        log('⚠️  messageAck: data incomplete, return');
+        return;
+      }
 
+      log(`🔍 Cari temp bubble dengan selector: [data-id="${tempId}"]`);
       const tempBubble = document.querySelector(`[data-id="${tempId}"]`);
+      log(`   Bubble ditemukan:`, !!tempBubble);
+      
       if (tempBubble) {
-        // set data-id pada bubble jadi id nyata
+        log(`✅ Update data-id dari ${tempId} → ${message.id}`);
         tempBubble.setAttribute('data-id', message.id);
-
-        // update waktu & centang
-        const meta = tempBubble.parentElement.querySelector('.meta');
+        
+        // Update UI (time & status)
+        const wrapper = tempBubble.parentElement;
+        const meta = wrapper.querySelector('.meta');
         if (meta) {
           const timeEl = meta.querySelector('.time');
-          if (timeEl) timeEl.innerText = new Date(message.timestamp || Date.now()).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+          if (timeEl) {
+            const newTime = new Date(message.timestamp).toLocaleTimeString('id-ID', {
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+            log(`   Update time: ${timeEl.innerText} → ${newTime}`);
+            timeEl.innerText = newTime;
+          }
 
           const tickEl = meta.querySelector('.tick');
           if (tickEl) {
-            if (message.status === 'delivered'){ tickEl.innerText='✓✓'; tickEl.className='tick tick-delivered' }
-            else if (message.status === 'read'){ tickEl.innerText='✓✓'; tickEl.className='tick tick-read' }
-            else { tickEl.innerText='✓'; tickEl.className='tick tick-sent' }
+            const oldTick = tickEl.innerText;
+            if (message.status === 'delivered') {
+              tickEl.innerText = '✓✓';
+              tickEl.className = 'tick tick-delivered';
+            } else if (message.status === 'read') {
+              tickEl.innerText = '✓✓';
+              tickEl.className = 'tick tick-read';
+            } else {
+              tickEl.innerText = '✓';
+              tickEl.className = 'tick tick-sent';
+            }
+            log(`   Update tick: ${oldTick} → ${tickEl.innerText}`);
           }
         }
 
-        // simpan mapping & id ke set untuk deduplikasi
-        tempToReal.set(tempId, message.id);
-        realToTemp.set(message.id, tempId);
-        sentMessages.add(message.id);
+        displayedMessageIds.add(message.id);
+        log(`✅ Ditambah ke displayedMessageIds: ${message.id}`);
+        log(`   displayedMessageIds sekarang:`, Array.from(displayedMessageIds));
       } else {
-        // fallback: kalau tidak ditemukan temp bubble, tambahkan pesan baru
+        log(`❌ Temp bubble TIDAK DITEMUKAN untuk tempId: ${tempId}`);
+        log(`   ⚠️  FALLBACK: tambah pesan baru (ini yang menyebabkan duplikat!)`);
         tambahPesanKeUI(message);
-        sentMessages.add(message.id);
+        displayedMessageIds.add(message.id);
       }
     });
-
-    // Handler: pesan baru dari server. Jangan tambah kalau id sudah tampil
+    
+    // Incoming message
     socket.on('newMessage', (msg) => {
-      log('newMessage', msg);
-      if (!msg || !msg.id) return;
+      log('📩 newMessage EVENT DITERIMA:', msg);
+      if (!msg || !msg.id) {
+        log('⚠️  newMessage: msg incomplete, return');
+        return;
+      }
 
-      // Jika pesan ini sudah ada (sudah acked atau sebelumnya ditampilkan), hanya update status
-      if (sentMessages.has(msg.id) || Array.from(tempToReal.values()).includes(msg.id)) {
+      log(`🔍 Check if ${msg.id} sudah ditampilkan...`);
+      log(`   displayedMessageIds:`, Array.from(displayedMessageIds));
+      
+      if (displayedMessageIds.has(msg.id)) {
+        log(`✅ ${msg.id} SUDAH ditampilkan, hanya update status`);
         updateStatusBubble(msg.id, msg.status);
         return;
       }
 
+      log(`❌ ${msg.id} BELUM ditampilkan, tambahkan ke UI`);
+      tambahPesanKeUI(msg);  // ✅ UNCOMMENT ini
+      displayedMessageIds.add(msg.id);
+      scrollKeBawah();
+    });
+    // Incoming message (dari customer atau broadcast dari server)
+    socket.on('newMessage', (msg) => {
+      log('newMessage', msg);
+      if (!msg || !msg.id) return;
+
+      // JANGAN tambah kalau real ID sudah ditampilkan
+      if (displayedMessageIds.has(msg.id)) {
+        log(`newMessage: skip karena ${msg.id} sudah ditampilkan`);
+        updateStatusBubble(msg.id, msg.status);
+        return;
+      }
+
+      log(`newMessage: adding ${msg.id} ke UI`);
       tambahPesanKeUI(msg);
-      sentMessages.add(msg.id);
+      displayedMessageIds.add(msg.id);
       scrollKeBawah();
     });
 
-    // Typing / presence / receipt handlers (opsional)
     socket.on('typing', (data) => {
       typingStatus.innerHTML = data?.isTyping ? 'Sedang mengetik...' : '';
       if (data?.isTyping){
-        clearTimeout(window._typingTimeout); window._typingTimeout = setTimeout(()=>{ typingStatus.innerHTML=''; }, 3500);
+        clearTimeout(window._typingTimeout);
+        window._typingTimeout = setTimeout(() => {
+          typingStatus.innerHTML = '';
+        }, 3500);
       }
     });
 
     socket.on('presence', (data) => {
       let text = data?.isOnline ? 'Online' : 'Offline';
-      if (!data?.isOnline && data?.lastSeen) text += ` • Terakhir dilihat: ${new Date(data.lastSeen).toLocaleString('id-ID')}`;
+      if (!data?.isOnline && data?.lastSeen) {
+        text += ` • Terakhir dilihat: ${new Date(data.lastSeen).toLocaleString('id-ID')}`;
+      }
       presenceStatus.innerHTML = text;
     });
 
@@ -243,18 +290,18 @@
       updateStatusBubble(data.messageId, data.status);
     });
 
-    // Kirim pesan (optimistic UI)
-    function kirimPesan(){
+        function kirimPesan(){
       const chatId = chatIdInput.value.trim();
       const text = textInput.value.trim();
       if (!chatId || !text) return alert('Isi chatId dan pesan!');
 
       const tempId = 'temp-' + Date.now() + '-' + Math.floor(Math.random()*9999);
-      // Kirim ke server dengan tempId
+      
+      log(`🚀 kirimPesan: emit sendMessage dengan tempId=${tempId}`);
       socket.emit('sendMessage', { chatId, text, tempId });
-      log('emit sendMessage', { chatId, tempId, text });
 
       // Tampilkan optimistic bubble
+      log(`📝 Tambah optimistic bubble dengan tempId=${tempId}`);
       tambahPesanKeUI({
         id: tempId,
         chatId,
@@ -263,14 +310,14 @@
         status: 'sent',
         timestamp: new Date().toISOString()
       });
-      // tandai tempId sebagai "sudah ditampilkan" (tapi bukan real id)
-      // tidak dimasukkan ke sentMessages agar dapat diganti saat ack datang
+      
+      log(`✅ displayedMessageIds SEBELUM ack:`, Array.from(displayedMessageIds));
+
       textInput.value = '';
       textInput.focus();
       scrollKeBawah();
     }
 
-    // Tambah pesan ke UI (dipakai untuk pesan masuk & optimistic)
     function tambahPesanKeUI(msg){
       const isSent = msg.from === 'agent';
       const wrapper = document.createElement('div');
@@ -281,7 +328,6 @@
       const bubble = document.createElement('div');
       bubble.className = `message ${isSent ? 'sent' : 'received'}`;
       bubble.setAttribute('data-id', msg.id);
-
       bubble.innerText = msg.text || '[Pesan lain]';
 
       const meta = document.createElement('div');
@@ -289,15 +335,22 @@
       const time = document.createElement('div');
       time.className = 'time';
       const ts = msg.timestamp ? new Date(msg.timestamp) : new Date();
-      time.innerText = ts.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+      time.innerText = ts.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
       meta.appendChild(time);
 
       if (isSent){
         const tick = document.createElement('div');
         tick.className = 'tick tick-sent';
-        if (msg.status === 'sent'){ tick.innerText = '✓'; tick.className = 'tick tick-sent' }
-        else if (msg.status === 'delivered'){ tick.innerText = '✓✓'; tick.className='tick tick-delivered' }
-        else if (msg.status === 'read'){ tick.innerText = '✓✓'; tick.className='tick tick-read' }
+        if (msg.status === 'sent') { 
+          tick.innerText = '✓'; 
+          tick.className = 'tick tick-sent';
+        } else if (msg.status === 'delivered') { 
+          tick.innerText = '✓✓'; 
+          tick.className = 'tick tick-delivered';
+        } else if (msg.status === 'read') { 
+          tick.innerText = '✓✓'; 
+          tick.className = 'tick tick-read';
+        }
         meta.appendChild(tick);
       }
 
@@ -306,17 +359,10 @@
       chatContainer.appendChild(wrapper);
     }
 
-    // Update centang/status pada bubble (mencari dengan real id atau temp mapping)
     function updateStatusBubble(messageId, status){
-      // jika kita punya mapping real->temp, gunakan temp bubble dulu (kemungkinan optimistic)
-      const maybeTemp = realToTemp.get(messageId);
-      const selectorId = maybeTemp || messageId;
-      const bubble = document.querySelector(`[data-id="${selectorId}"]`);
+      const bubble = document.querySelector(`[data-id="${messageId}"]`);
       if (!bubble) {
-        // kalau tidak ada bubble yang cocok, coba temukan dengan real id
-        const fallback = document.querySelector(`[data-id="${messageId}"]`);
-        if (!fallback) return;
-        updateMetaForBubble(fallback, status);
+        log(`updateStatusBubble: bubble ${messageId} tidak ditemukan`);
         return;
       }
       updateMetaForBubble(bubble, status);
@@ -327,17 +373,26 @@
       if (!meta) return;
       const tickEl = meta.querySelector('.tick');
       if (!tickEl) return;
-      if (status === 'delivered'){ tickEl.innerText='✓✓'; tickEl.className='tick tick-delivered' }
-      else if (status === 'read'){ tickEl.innerText='✓✓'; tickEl.className='tick tick-read' }
-      else { tickEl.innerText='✓'; tickEl.className='tick tick-sent' }
+      if (status === 'delivered') { 
+        tickEl.innerText = '✓✓'; 
+        tickEl.className = 'tick tick-delivered';
+      } else if (status === 'read') { 
+        tickEl.innerText = '✓✓'; 
+        tickEl.className = 'tick tick-read';
+      } else { 
+        tickEl.innerText = '✓'; 
+        tickEl.className = 'tick tick-sent';
+      }
     }
 
-    function scrollKeBawah(){ chatContainer.scrollTop = chatContainer.scrollHeight; }
+    function scrollKeBawah(){ 
+      chatContainer.scrollTop = chatContainer.scrollHeight; 
+    }
 
-    // keep view visible on mobile when keyboard opened
-    window.addEventListener('resize', ()=>{ setTimeout(scrollKeBawah, 100); });
+    window.addEventListener('resize', ()=>{ 
+      setTimeout(scrollKeBawah, 100); 
+    });
 
-    // debugging helper: tampilkan event masuk di console
     ['connect','disconnect','reconnect','reconnect_attempt'].forEach(e=>{
       socket.on(e,(...a)=>log('socket event',e,...a));
     });

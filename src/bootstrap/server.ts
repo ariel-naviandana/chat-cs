@@ -6,15 +6,14 @@ import dotenv from 'dotenv';
 import { setupAgentSocket } from '../adapters/input/websocket/agent.socket.handler';
 
 import { BaileysAdapter } from '../adapters/output/whatsapp/baileys.adapter';
-import { MongooseMessageRepository } from '../adapters/output/database/mongoose/message.repository.adapter'; // nanti kita buat ini
-import { SocketNotificationAdapter } from '../adapters/output/notification/socket.notification.adapter'; // nanti kita buat
+import { MongooseMessageRepository } from '../adapters/output/database/mongoose/message.repository.adapter';
+import { SocketNotificationAdapter } from '../adapters/output/notification/socket.notification.adapter';
 
 import { SendMessageUseCase } from '../core/application/usecases/send-message.usecase';
 
 dotenv.config();
 
 async function startServer() {
-  // 1. Connect MongoDB
   try {
     await mongoose.connect(process.env.MONGO_URI!);
     console.log('MongoDB connected successfully');
@@ -23,26 +22,23 @@ async function startServer() {
     process.exit(1);
   }
 
-  // 2. Init Express & Socket.io
   const app = express();
   app.use(express.json());
 
   const httpServer = http.createServer(app);
   const io = new SocketServer(httpServer, {
     cors: {
-      origin: '*', // nanti ubah ke domain frontend kalau deploy
+      origin: '*',
       methods: ['GET', 'POST']
     }
   });
 
-  // 3. Init adapters
   const whatsappAdapter = new BaileysAdapter();
-  await whatsappAdapter.initialize(); // ini yang akan print QR di terminal
+  await whatsappAdapter.initialize();
 
-  const messageRepo = new MongooseMessageRepository(); // placeholder, nanti kita buat file ini
+  const messageRepo = new MongooseMessageRepository();
   const notificationAdapter = new SocketNotificationAdapter(io);
 
-  // 4. Init use case
   const sendMessageUseCase = new SendMessageUseCase(
     whatsappAdapter,
     messageRepo,
@@ -51,28 +47,37 @@ async function startServer() {
 
   setupAgentSocket(io, sendMessageUseCase);
 
- whatsappAdapter.onMessage(async (message) => {
-  await messageRepo.saveMessage(message);
-  notificationAdapter.notifyNewMessage(message);
-  // Optional: kalau mau kirim typing ke agent lain, bisa tambah logic
-});
+    // INCOMING MESSAGE dari WhatsApp (customer kirim ke kita)
+  whatsappAdapter.onMessage(async (message) => {
+    console.log('[Server] ✅ onMessage callback triggered, emit newMessage:', message.id);
+    
+    await messageRepo.saveMessage(message);
+    
+    console.log('[Server] ➤ Broadcast newMessage ke all-agents');
+    io.to('all-agents').emit('newMessage', message);
+  });
 
-whatsappAdapter.onPresenceUpdate((update) => {
-  console.log('[Baileys] Presence update:', update); // debug
-  notificationAdapter.notifyOnlineStatus(
-    update.chatId,
-    update.isOnline,
-    update.lastSeen
-  );
-  notificationAdapter.notifyTyping(update.chatId, update.isTyping);
-});
+  whatsappAdapter.onPresenceUpdate((update) => {
+    console.log('[Baileys] Presence update:', update);
+    notificationAdapter.notifyOnlineStatus(
+      update.chatId,
+      update.isOnline,
+      update.lastSeen
+    );
+    notificationAdapter.notifyTyping(update.chatId, update.isTyping);
+  });
 
-whatsappAdapter.onReceiptUpdate((update) => {
-  console.log('[Baileys] Receipt update:', update); // debug
-  notificationAdapter.notifyReceipt(update.messageId, update.status);
-});
+  whatsappAdapter.onReceiptUpdate((update) => {
+    console.log('[Server] 📬 Receipt update:', update);
+    
+    // ✅ 1. Update DB
+    messageRepo.updateMessageStatus(update.messageId, update.status)
+      .catch(err => console.error('[Server] Error updating message status:', err));
+    
+    // ✅ 2. Emit ke agents (notify UI)
+    notificationAdapter.notifyReceipt(update.messageId, update.status);
+  });
 
-  // 6. Contoh endpoint sederhana untuk test (nanti diganti controller full)
   app.post('/api/test-send', async (req, res) => {
     const { chatId, text } = req.body;
     if (!chatId || !text) {
@@ -87,7 +92,6 @@ whatsappAdapter.onReceiptUpdate((update) => {
     }
   });
 
-  // 7. Start server
   const PORT = process.env.PORT || 3000;
   httpServer.listen(PORT, () => {
     console.log(`Server berjalan di http://localhost:${PORT}`);
@@ -95,7 +99,6 @@ whatsappAdapter.onReceiptUpdate((update) => {
   });
 }
 
-// Jalankan server
 startServer().catch((err) => {
   console.error('Error saat start server:', err);
   process.exit(1);
