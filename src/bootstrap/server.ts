@@ -48,14 +48,20 @@ async function startServer() {
   setupAgentSocket(io, sendMessageUseCase);
 
     // INCOMING MESSAGE dari WhatsApp (customer kirim ke kita)
-  whatsappAdapter.onMessage(async (message) => {
-    console.log('[Server] ✅ onMessage callback triggered, emit newMessage:', message.id);
-    
-    await messageRepo.saveMessage(message);
-    
-    console.log('[Server] ➤ Broadcast newMessage ke all-agents');
+  // di server.ts
+const OUR_NUMBER = '6282132102349@s.whatsapp.net'; // ganti dengan nomor kamu
+
+whatsappAdapter.onMessage(async (message) => {
+  await messageRepo.saveMessage(message);
+
+  const isFromUs = message.from === OUR_NUMBER || message.from.includes('status@broadcast');
+
+  if (!isFromUs) {
     io.to('all-agents').emit('newMessage', message);
-  });
+  } else {
+    console.log('[Server] Pesan keluar dari kita — tidak dibroadcast');
+  }
+});
 
   whatsappAdapter.onPresenceUpdate((update) => {
     console.log('[Baileys] Presence update:', update);
