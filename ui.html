@@ -262,10 +262,18 @@ socket.on('messageAck', (data) => {
     });
 
     socket.on('receipt', (data) => {
-      log('receipt', data);
-      if (!data?.messageId) return;
-      updateStatusBubble(data.messageId, data.status);
-    });
+  log('===== RECEIPT EVENT DITERIMA =====');
+  log('Data receipt:', data);
+
+  if (!data?.messageId) {
+    log('Receipt tanpa messageId, skip');
+    return;
+  }
+
+  log(`Mencoba update status pesan ${data.messageId} → ${data.status}`);
+
+  updateStatusBubble(data.messageId, data.status);
+});
 
         function kirimPesan() {
   const chatId = chatIdInput.value.trim();

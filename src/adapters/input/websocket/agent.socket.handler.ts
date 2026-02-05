@@ -24,6 +24,7 @@ export function setupAgentSocket(
           id: messageId,
           chatId: data.chatId,
           from: 'agent',
+          fromMe: true,
           text: data.text || '',
           status: 'sent',
           timestamp: new Date(),

@@ -74,15 +74,15 @@ whatsappAdapter.onMessage(async (message) => {
   });
 
   whatsappAdapter.onReceiptUpdate((update) => {
-    console.log('[Server] 📬 Receipt update:', update);
-    
-    // ✅ 1. Update DB
-    messageRepo.updateMessageStatus(update.messageId, update.status)
-      .catch(err => console.error('[Server] Error updating message status:', err));
-    
-    // ✅ 2. Emit ke agents (notify UI)
-    notificationAdapter.notifyReceipt(update.messageId, update.status);
-  });
+  console.log('[Server] 📬 Receipt update diterima:', update);
+
+  messageRepo.updateMessageStatus(update.messageId, update.status)
+    .catch(err => console.error('Gagal update status di DB:', err));
+
+  // Pastikan emit ini berjalan
+  console.log('[Server] ➤ Emit receipt ke all-agents:', update.messageId, update.status);
+  notificationAdapter.notifyReceipt(update.messageId, update.status);
+});
 
   app.post('/api/test-send', async (req, res) => {
     const { chatId, text } = req.body;

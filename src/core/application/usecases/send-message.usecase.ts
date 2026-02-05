@@ -12,34 +12,76 @@ export class SendMessageUseCase implements SendMessageUseCasePort {
     private notificationPort: NotificationPort
   ) {}
 
-  async execute(dto: { chatId: string; text?: string; quotedId?: string; media?: any }): Promise<string> {
-  console.log('[UseCase] Mulai kirim pesan:', dto);
+  async execute(
+    dto: {
+      chatId: string;
+      text?: string;
+      quotedId?: string;
+      media?: any;
+      tempId?: string;          // ← tambahkan ini (dari client)
+    }
+  ): Promise<string> {
+    console.log('[UseCase] Mulai kirim pesan:', dto);
 
-  const message: Partial<Message> = {
-    chatId: dto.chatId,
-    from: 'agent',
-    text: dto.text,
-    quotedMessageId: dto.quotedId,
-    status: 'sent',
-    timestamp: new Date(),
-    isPinned: false,
-  };
+    const now = new Date();
 
-  try {
-    const messageId = await this.whatsappPort.sendMessage(dto.chatId, {
+    // 1. Buat entitas pesan dengan status awal 'sending'
+    const outgoingMessage: Message = {
+      id: '', // akan diisi setelah kirim
+      chatId: dto.chatId,
+      from: 'me',               // atau ganti dengan nomor WA kamu nanti
+      fromMe: true,             // sangat penting!
       text: dto.text,
-      quotedId: dto.quotedId,
-    });
-    console.log('[UseCase] Dapat messageId dari Baileys:', messageId);
+      quotedMessageId: dto.quotedId,
+      status: 'sending',        // atau 'sent' kalau mau langsung
+      timestamp: now,
+      isPinned: false,
+    };
 
-    message.id = messageId;
-    await this.messageRepository.saveMessage(message as Message);
-    this.notificationPort.notifyNewMessage(message as Message);
+    try {
+      // 2. Kirim ke WhatsApp (sekarang return object)
+      const sendResult = await this.whatsappPort.sendMessage(dto.chatId, {
+        text: dto.text,
+        quotedId: dto.quotedId,
+        // media: dto.media,      // nanti kalau sudah support
+      });
 
-    return messageId;
-  } catch (error) {
-    console.error('[UseCase] ERROR saat kirim:', error);
-    throw error;
+      const { messageId, timestamp } = sendResult;
+
+      console.log('[UseCase] Berhasil kirim, messageId:', messageId);
+
+      // 3. Update dengan data real dari WhatsApp
+      outgoingMessage.id = messageId;
+      outgoingMessage.timestamp = new Date(timestamp * 1000);
+      outgoingMessage.status = 'sent'; // sekarang resmi terkirim ke server WA
+
+      // 4. Simpan ke database
+      await this.messageRepository.saveMessage(outgoingMessage);
+
+      // 5. Beritahu client yang mengirim (khusus untuk mengganti tempId → real id)
+      if (dto.tempId) {
+        this.notificationPort.notifyMessageAck({
+          tempId: dto.tempId,
+          message: outgoingMessage,
+        });
+      }
+
+      // 6. (Opsional) Broadcast ke agent lain hanya jika multi-agent
+      // Jika hanya 1 agent atau kamu ingin hindari duplikat di UI,
+      // lebih baik **tidak broadcast** pesan keluar ke 'all-agents'
+      // this.notificationPort.notifyNewMessage(outgoingMessage);
+
+      return messageId;
+    } catch (error) {
+      console.error('[UseCase] Gagal mengirim pesan:', error);
+
+      // Optional: update status ke 'failed' kalau sudah punya id
+      if (outgoingMessage.id) {
+        outgoingMessage.status = 'failed';
+        await this.messageRepository.saveMessage(outgoingMessage).catch(() => {});
+      }
+
+      throw error;
+    }
   }
-}
 }

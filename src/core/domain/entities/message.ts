@@ -2,6 +2,7 @@ export interface Message {
   id: string;                  // ID pesan dari WhatsApp (key.id)
   chatId: string;              // JID chat: '628123456789@s.whatsapp.net' atau group JID
   from: string;                // Pengirim (JID atau 'me' kalau dari agent)
+  fromMe: boolean;
   text?: string;               // Isi teks pesan
   media?: {
     type: 'image' | 'video' | 'document' | 'audio' | 'sticker';
@@ -10,7 +11,7 @@ export interface Message {
     fileName?: string;
   };
   quotedMessageId?: string;    // ID pesan yang di-reply
-  status: 'sent' | 'delivered' | 'read';
+  status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   timestamp: Date;
   isPinned: boolean;
 }
