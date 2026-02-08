@@ -6,137 +6,197 @@
   <title>CS Chat Test</title>
 
   <style>
-    :root{
-      --accent:#075e54;
-      --bg:#e5ddd5;
-      --bubble-sent:#dcf8c6;
-      --bubble-recv:#ffffff;
-      --muted:#667781;
-      --delivered:#53bdeb;
-      --read:#4fc3f7;
-      --input-height:68px;
-      --sidebar-width:320px;
+    :root {
+      --accent: #075e54;
+      --bg: #e5ddd5;
+      --bubble-sent: #dcf8c6;
+      --bubble-recv: #ffffff;
+      --muted: #667781;
+      --delivered: #53bdeb;
+      --read: #4fc3f7;
+      --input-height: 68px;
+      --sidebar-width: 320px;
     }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;
-      margin:0;
-      display:flex;
-      height:100vh;
-      background:var(--bg);
-      -webkit-font-smoothing:antialiased;
-    }
-
-    .sidebar{
-      width:var(--sidebar-width);
-      background:#f0f2f5;
-      border-right:1px solid #ddd;
-      overflow-y:auto;
-      padding:16px;
-      display:flex;
-      flex-direction:column;
-    }
-    .sidebar h3{
-      margin:0 0 12px;
-      font-size:18px;
-      color:#111;
-    }
-    .chat-item{
-      padding:12px 16px;
-      border-radius:8px;
-      cursor:pointer;
-      margin-bottom:4px;
-      transition:background 0.2s;
-    }
-    .chat-item:hover,
-    .chat-item.active{
-      background:#e0f2f1;
-    }
-    .chat-item .title{
-      font-weight:500;
-      font-size:15px;
-    }
-    .chat-item .preview{
-      font-size:13px;
-      color:#555;
-      margin-top:4px;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial;
+      margin: 0;
+      display: flex;
+      height: 100vh;
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
     }
 
-    .main-chat{
-      flex:1;
-      display:flex;
-      flex-direction:column;
+    .sidebar {
+      width: var(--sidebar-width);
+      background: #f0f2f5;
+      border-right: 1px solid #ddd;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+    .sidebar h3 {
+      margin: 0 0 12px;
+      font-size: 18px;
+      color: #111;
+    }
+    .chat-item {
+      padding: 12px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-bottom: 4px;
+      transition: background 0.2s;
+    }
+    .chat-item:hover, .chat-item.active {
+      background: #e0f2f1;
+    }
+    .chat-item .title {
+      font-weight: 500;
+      font-size: 15px;
+    }
+    .chat-item .preview {
+      font-size: 13px;
+      color: #555;
+      margin-top: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    header{
-      background:var(--accent);
-      color:#fff;
-      padding:12px 16px;
-      display:flex;
-      gap:12px;
-      align-items:center;
-      box-shadow:0 1px 3px rgba(0,0,0,0.1);
-    }
-    .avatar{
-      width:44px;height:44px;border-radius:50%;
-      background:rgba(255,255,255,0.2);
-      display:flex;align-items:center;justify-content:center;
-      font-weight:700;font-size:18px;
-    }
-    .header-info{display:flex;flex-direction:column}
-    .header-title{font-weight:600;font-size:17px}
-    .header-status{font-size:13px;opacity:0.9;margin-top:2px}
-
-    .chat-container{
-      flex:1;
-      overflow-y:auto;
-      padding:18px 12px;
-      display:flex;
-      flex-direction:column;
-      gap:6px;
-      background-image:url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
-      background-repeat:repeat;
-      background-size:100%;
-      padding-bottom:calc(var(--input-height) + 20px);
-      scroll-behavior:smooth;
+    .main-chat {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
     }
 
-    #typingStatus{
-      font-size:13px;color:#333;padding:6px 12px;
-      background:rgba(255,255,255,0.9);border-radius:10px;align-self:center;
-      margin:8px 0;min-height:20px;display:inline-block;
-      box-shadow:0 1px 1px rgba(0,0,0,0.04);
+    header {
+      background: var(--accent);
+      color: #fff;
+      padding: 12px 16px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 18px;
+    }
+    .header-info { display: flex; flex-direction: column; }
+    .header-title { font-weight: 600; font-size: 17px; }
+    .header-status { font-size: 13px; opacity: 0.9; margin-top: 2px; }
+
+    .chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
+      background-repeat: repeat;
+      background-size: 100%;
+      padding-bottom: calc(var(--input-height) + 20px);
+      scroll-behavior: smooth;
     }
 
-    .message{
-      max-width:78%;padding:10px 14px;border-radius:12px;position:relative;
-      word-wrap:break-word;font-size:14.2px;line-height:19px;display:inline-block;
-      box-shadow:0 1px 0 rgba(0,0,0,0.04);
+    #typingStatus {
+      font-size: 13px;
+      color: #333;
+      padding: 6px 12px;
+      background: rgba(255,255,255,0.9);
+      border-radius: 10px;
+      align-self: center;
+      margin: 8px 0;
+      min-height: 20px;
+      display: inline-block;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.04);
     }
-    .sent{background:var(--bubble-sent);align-self:flex-end;margin-left:auto;border-bottom-right-radius:4px}
-    .received{background:var(--bubble-recv);align-self:flex-start;margin-right:auto;border-bottom-left-radius:4px}
 
-    .meta{display:flex;gap:6px;align-items:center;justify-content:flex-end;margin-top:4px;font-size:11px;color:var(--muted)}
-    .meta .time{opacity:0.95}
-    .tick{display:inline-flex;align-items:center;justify-content:center;min-width:18px;margin-left:6px;font-size:12px;line-height:1}
-    .tick-sent{color:var(--muted)}
-    .tick-delivered{color:var(--delivered)}
-    .tick-read{color:var(--read)}
+    .message {
+      max-width: 78%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      position: relative;
+      word-wrap: break-word;
+      font-size: 14.2px;
+      line-height: 19px;
+      display: inline-block;
+      box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+    }
+    .sent {
+      background: var(--bubble-sent);
+      align-self: flex-end;
+      margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+    .received {
+      background: var(--bubble-recv);
+      align-self: flex-start;
+      margin-right: auto;
+      border-bottom-left-radius: 4px;
+    }
 
-    .input-area{
-      height:var(--input-height);
-      background:rgba(255,255,255,0.98);padding:10px;display:flex;align-items:center;gap:8px;
-      border-top:1px solid #e6e6e6;box-shadow:0 -2px 8px rgba(0,0,0,0.04);
+    .meta {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      justify-content: flex-end;
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--muted);
     }
-    .input-area input{
-      flex:1;height:44px;padding:10px 16px;border-radius:22px;border:1px solid #ddd;outline:none;font-size:15px;
+    .meta .time { opacity: 0.95; }
+    .tick {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      margin-left: 6px;
+      font-size: 12px;
+      line-height: 1;
     }
-    button{
-      background:var(--accent);color:#fff;border:none;padding:0 20px;border-radius:22px;cursor:pointer;font-weight:600;height:44px;
+    .tick-sent { color: var(--muted); }
+    .tick-delivered { color: var(--delivered); }
+    .tick-read { color: var(--read); }
+
+    .input-area {
+      height: var(--input-height);
+      background: rgba(255,255,255,0.98);
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-top: 1px solid #e6e6e6;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
+    }
+    .input-area input {
+      flex: 1;
+      height: 44px;
+      padding: 10px 16px;
+      border-radius: 22px;
+      border: 1px solid #ddd;
+      outline: none;
+      font-size: 15px;
+    }
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 0 20px;
+      border-radius: 22px;
+      cursor: pointer;
+      font-weight: 600;
+      height: 44px;
     }
     .unread-badge {
       background: #25d366;
@@ -148,9 +208,9 @@
       display: inline-block;
     }
 
-    @media(max-width:768px){
-      .sidebar{width:260px}
-      .message{max-width:82%}
+    @media (max-width: 768px) {
+      .sidebar { width: 260px; }
+      .message { max-width: 82%; }
     }
   </style>
 </head>
@@ -172,7 +232,6 @@
 
     <div class="chat-container" id="chatContainer">
       <div id="typingStatus"></div>
-      <!-- pesan akan ditambahkan di sini -->
     </div>
 
     <div class="input-area">
@@ -185,7 +244,7 @@
   <script>
   const socket = io('http://localhost:3000', {
     path: '/socket.io/',
-    transports: ['polling','websocket'],
+    transports: ['polling', 'websocket'],
     reconnection: true,
     timeout: 10000
   });
@@ -200,10 +259,20 @@
 
   let currentChatId = null;
   const displayedMessageIds = new Set();
+  let typingTimeout = null;
 
-  function log(...args) { console.debug('[UI]', ...args) }
+  function log(...args) { console.debug('[UI]', ...args); }
 
   textInput.focus();
+
+  textInput.addEventListener('input', () => {
+    if (currentChatId) {
+      clearTimeout(typingTimeout);
+      socket.emit('startTyping', { chatId: currentChatId });
+      typingTimeout = setTimeout(() => socket.emit('stopTyping', { chatId: currentChatId }), 3000);
+    }
+  });
+
   textInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); kirimPesan(); }
   });
@@ -220,7 +289,6 @@
     log('connect_error', err);
   });
 
-  // Terima list chat
   socket.on('chatsList', (chats) => {
     log('chatsList received', chats.length);
     chatList.innerHTML = '';
@@ -229,7 +297,6 @@
       return;
     }
 
-    // Urutkan chat berdasarkan timestamp terbaru
     chats.sort((a, b) => {
       const ta = a.lastMessage?.timestamp ? new Date(a.lastMessage.timestamp).getTime() : 0;
       const tb = b.lastMessage?.timestamp ? new Date(b.lastMessage.timestamp).getTime() : 0;
@@ -254,7 +321,6 @@
       chatList.appendChild(li);
     });
 
-    // Auto load chat terbaru kalau belum ada chat aktif
     if (chats.length > 0 && !currentChatId) {
       const latest = chats[0];
       currentChatId = latest.id;
@@ -283,13 +349,11 @@
     scrollKeBawah();
   });
 
-  // Real-time pesan baru
   socket.on('newMessage', (msg) => {
     log('[newMessage] received:', msg.id, msg.chatId, msg.text?.substring(0,30) || '[no text]');
 
     if (!msg || !msg.chatId || !msg.id) return;
 
-    // Highlight sidebar kalau pesan baru di chat lain
     const li = [...document.querySelectorAll('.chat-item')].find(el => el.dataset.chatid === msg.chatId);
     if (li && msg.chatId !== currentChatId) {
       let badge = li.querySelector('.unread-badge');
@@ -308,7 +372,6 @@
       badge.innerText = count;
     }
 
-    // Append kalau chat aktif
     if (currentChatId && msg.chatId === currentChatId) {
       if (displayedMessageIds.has(msg.id)) return;
       tambahPesanKeUI(msg);
@@ -319,7 +382,6 @@
     }
   });
 
-  // messageAck untuk update tempId & status
   socket.on('messageAck', (data) => {
     if (!data?.tempId || !data?.message?.id) return;
     log('[messageAck]', data.tempId, '→', data.message.id);
@@ -327,11 +389,11 @@
     const tempBubble = document.querySelector(`[data-id="${data.tempId}"]`);
     if (tempBubble) {
       tempBubble.setAttribute('data-id', data.message.id);
-      const meta = tempBubble.parentElement.querySelector('.meta');
+      const meta = tempBubble.parentElement?.querySelector('.meta');
       if (meta) {
         const timeEl = meta.querySelector('.time');
         if (timeEl && data.message.timestamp) {
-          timeEl.innerText = new Date(data.message.timestamp).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+          timeEl.innerText = new Date(data.message.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
         }
         const tickEl = meta.querySelector('.tick');
         if (tickEl) {
@@ -381,13 +443,13 @@
     const tempId = 'temp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
 
     tambahPesanKeUI({
-  id: tempId,
-  chatId: currentChatId,
-  fromMe: true,  // ← tambahkan ini supaya konsisten
-  text,
-  status: 'sent',
-  timestamp: new Date().toISOString()
-});
+      id: tempId,
+      chatId: currentChatId,
+      fromMe: true,
+      text,
+      status: 'sent',
+      timestamp: new Date().toISOString()
+    });
 
     displayedMessageIds.add(tempId);
 
@@ -398,62 +460,63 @@
     scrollKeBawah();
   }
 
-  function tambahPesanKeUI(msg){
-  const isSent = msg.fromMe === true;  // ← pakai ini, bukan msg.from === 'agent'
+  function tambahPesanKeUI(msg) {
+    const isSent = msg.fromMe === true;
 
-  const wrapper = document.createElement('div');
-  wrapper.style.display = 'flex';
-  wrapper.style.flexDirection = 'column';
-  wrapper.style.alignItems = isSent ? 'flex-end' : 'flex-start';
+    const wrapper = document.createElement('div');
+    wrapper.style.display = 'flex';
+    wrapper.style.flexDirection = 'column';
+    wrapper.style.alignItems = isSent ? 'flex-end' : 'flex-start';
 
-  const bubble = document.createElement('div');
-  bubble.className = `message ${isSent ? 'sent' : 'received'}`;
-  bubble.setAttribute('data-id', msg.id);
-  bubble.innerText = msg.text || '[Pesan lain]';
+    const bubble = document.createElement('div');
+    bubble.className = `message ${isSent ? 'sent' : 'received'}`;
+    bubble.setAttribute('data-id', msg.id);
+    bubble.innerText = msg.text || '[Pesan lain]';
 
-  const meta = document.createElement('div');
-  meta.className = 'meta';
-  const time = document.createElement('div');
-  time.className = 'time';
-  const ts = msg.timestamp ? new Date(msg.timestamp) : new Date();
-  time.innerText = ts.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-  meta.appendChild(time);
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const time = document.createElement('div');
+    time.className = 'time';
+    const ts = msg.timestamp ? new Date(msg.timestamp) : new Date();
+    time.innerText = ts.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    meta.appendChild(time);
 
-  if (isSent){
-    const tick = document.createElement('div');
-    tick.className = 'tick tick-sent';
-    tick.innerText = '✓';
-    meta.appendChild(tick);
+    if (isSent) {
+      const tick = document.createElement('div');
+      tick.className = 'tick tick-sent';
+      tick.innerText = '✓';
+      meta.appendChild(tick);
+    }
+
+    wrapper.appendChild(bubble);
+    wrapper.appendChild(meta);
+    chatContainer.appendChild(wrapper);
   }
 
-  wrapper.appendChild(bubble);
-  wrapper.appendChild(meta);
-  chatContainer.appendChild(wrapper);
-}
-  function updateStatusBubble(messageId, status){
+  function updateStatusBubble(messageId, status) {
     const bubble = document.querySelector(`[data-id="${messageId}"]`);
     if (!bubble) return;
-    const meta = bubble.parentElement.querySelector('.meta');
+    const meta = bubble.parentElement?.querySelector('.meta');
     if (!meta) return;
     const tickEl = meta.querySelector('.tick');
     if (!tickEl) return;
-    if (status === 'delivered') { 
-      tickEl.innerText = '✓✓'; 
+    if (status === 'delivered') {
+      tickEl.innerText = '✓✓';
       tickEl.className = 'tick tick-delivered';
-    } else if (status === 'read') { 
-      tickEl.innerText = '✓✓'; 
+    } else if (status === 'read') {
+      tickEl.innerText = '✓✓';
       tickEl.className = 'tick tick-read';
-    } else { 
-      tickEl.innerText = '✓'; 
+    } else {
+      tickEl.innerText = '✓';
       tickEl.className = 'tick tick-sent';
     }
   }
 
-  function scrollKeBawah(){ 
-    chatContainer.scrollTop = chatContainer.scrollHeight; 
+  function scrollKeBawah() {
+    chatContainer.scrollTop = chatContainer.scrollHeight;
   }
 
-  window.addEventListener('resize', ()=>{ setTimeout(scrollKeBawah, 100); });
-</script>
+  window.addEventListener('resize', () => { setTimeout(scrollKeBawah, 100); });
+  </script>
 </body>
 </html>

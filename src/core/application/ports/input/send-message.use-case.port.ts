@@ -3,6 +3,7 @@ export interface SendMessageUseCasePort {
     chatId: string;
     text?: string;
     quotedId?: string;
-    media?: { type: string; buffer: Buffer; mimeType: string }; // nanti untuk kirim file
-  }): Promise<string>; // return message ID
+    media?: { type: string; buffer: Buffer; mimeType: string };
+    tempId?: string;
+  }): Promise<string>;
 }

@@ -11,7 +11,7 @@ import { Chat } from '../../../core/domain/entities/chat';
 
 export class BaileysAdapter implements WhatsappPort {
   private sock: any = null;
-  private sentMessageIds: Set<string> = new Set(); // Track pesan yang kita kirim
+  private sentMessageIds: Set<string> = new Set();
 
   async initialize(): Promise<void> {
     const { state, saveCreds } = await useMultiFileAuthState('./auth_info/baileys');
@@ -55,83 +55,76 @@ export class BaileysAdapter implements WhatsappPort {
   }
 
   async subscribePresence(chatId: string): Promise<void> {
-  if (!this.sock) {
-    console.warn('[Baileys] sock belum siap untuk subscribe presence');
-    return;
-  }
+    if (!this.sock) {
+      console.warn('[Baileys] sock belum siap untuk subscribe presence');
+      return;
+    }
 
-  try {
-    await this.sock.presenceSubscribe(chatId);
-    console.log('[Baileys] Berhasil subscribe presence untuk chat:', chatId);
-  } catch (err) {
-    console.error('[Baileys] Gagal subscribe presence untuk', chatId, ':', err);
+    try {
+      await this.sock.presenceSubscribe(chatId);
+      console.log('[Baileys] Berhasil subscribe presence untuk chat:', chatId);
+    } catch (err) {
+      console.error('[Baileys] Gagal subscribe presence untuk', chatId, ':', err);
+    }
   }
-}
 
   onMessage(callback: (message: Message) => Promise<void>): void {
-  this.sock.ev.on('messages.upsert', async (m: any) => {
-    console.log('[Baileys] RAW messages.upsert:', JSON.stringify(m, null, 2));
+    this.sock.ev.on('messages.upsert', async (m: any) => {
+      console.log('[Baileys] RAW messages.upsert:', JSON.stringify(m, null, 2));
 
-    const msg = m.messages?.[0];
-    if (!msg) return;
+      const msg = m.messages?.[0];
+      if (!msg) return;
 
-    let chatId = msg.key.remoteJid;
+      let chatId = msg.key.remoteJid;
 
-    // FIX LID: remap ke JID asli kalau dari linked device
-    if (chatId.endsWith('@lid')) {
-      // Ambil JID asli dari alt atau context (Baileys kadang simpan di remoteJidAlt atau participant)
-      chatId = msg.key.remoteJidAlt || msg.key.participant || chatId;
-      console.log('[Baileys] Remap LID → JID asli:', chatId);
-    }
+      if (chatId.endsWith('@lid')) {
+        chatId = msg.key.remoteJidAlt || msg.key.participant || chatId;
+        console.log('[Baileys] Remap LID → JID asli:', chatId);
+      }
 
-    if (!msg.message || m.type !== 'notify') {
-      console.log('[Baileys] Skip: bukan notify atau tidak ada message');
-      return;
-    }
+      if (!msg.message || m.type !== 'notify') {
+        console.log('[Baileys] Skip: bukan notify atau tidak ada message');
+        return;
+      }
 
-    if (msg.key.fromMe) {
-      console.log('[Baileys] Skip: pesan outgoing kita sendiri');
-      return;
-    }
+      if (msg.key.fromMe) {
+        console.log('[Baileys] Skip: pesan outgoing kita sendiri');
+        return;
+      }
 
-    let text = '';
-    if (msg.message.conversation) text = msg.message.conversation;
-    else if (msg.message.extendedTextMessage?.text) text = msg.message.extendedTextMessage.text;
+      let text = '';
+      if (msg.message.conversation) text = msg.message.conversation;
+      else if (msg.message.extendedTextMessage?.text) text = msg.message.extendedTextMessage.text;
 
-    const parsedMessage: Message = {
-      id: msg.key.id!,
-      chatId,  // ← pakai chatId yang sudah diremap
-      from: msg.key.participant || msg.key.remoteJid!,
-      fromMe: msg.key.fromMe === true,
-      text,
-      status: 'delivered',
-      timestamp: new Date((msg.messageTimestamp || 0) * 1000),
-      isPinned: false,
-    };
+      const parsedMessage: Message = {
+        id: msg.key.id!,
+        chatId,
+        from: msg.key.participant || msg.key.remoteJid!,
+        fromMe: msg.key.fromMe === true,
+        text,
+        status: 'delivered',
+        timestamp: new Date((msg.messageTimestamp || 0) * 1000),
+        isPinned: false,
+      };
 
-    console.log('[Baileys] ✅ Processing incoming (remapped):', parsedMessage);
-    await callback(parsedMessage);
-  });
-}
+      console.log('[Baileys] Processing incoming (remapped):', parsedMessage.id, parsedMessage.text);
+      await callback(parsedMessage);
+    });
+  }
 
-  // Method sendMessage – return object { messageId, timestamp }
   async sendMessage(
     chatId: string,
-    content: { text?: string; quotedId?: string; media?: any },
+    content: { text?: string; quotedId?: string; media?: any }
   ): Promise<{ messageId: string; timestamp: number }> {
     if (!this.sock) throw new Error('Baileys belum diinisialisasi');
 
     console.log('[Baileys] Mencoba kirim pesan ke:', chatId);
-    console.log('[Baileys] Isi pesan:', content);
 
     const msgContent: any = { text: content.text || '' };
 
     if (content.quotedId) {
-      console.log('[Baileys] Ada quotedId:', content.quotedId);
       msgContent.quoted = { key: { id: content.quotedId }, message: { conversation: '...' } };
     }
-
-    // nanti bisa ditambahkan penanganan media di sini jika sudah support
 
     try {
       const sent = await this.sock.sendMessage(chatId, msgContent);
@@ -142,7 +135,6 @@ export class BaileysAdapter implements WhatsappPort {
       }
 
       console.log('[Baileys] Sukses kirim! Message key ID:', messageId);
-      console.log('[Baileys] Full sent object:', JSON.stringify(sent, null, 2));
 
       this.sentMessageIds.add(messageId);
 
@@ -157,38 +149,41 @@ export class BaileysAdapter implements WhatsappPort {
   }
 
   onPresenceUpdate(callback: (update: { chatId: string; isOnline: boolean; isTyping: boolean; lastSeen?: Date }) => void): void {
-  this.sock.ev.on('presence.update', (upd: any) => {
-    console.log('[Baileys] RAW presence.update event:', JSON.stringify(upd, null, 2)); // log raw data
-    const isTyping = upd.presence?.unavailable !== true && upd.presence?.composing;
-    const parsed = {
-      chatId: upd.id,
-      isOnline: upd.presence?.available === true,
-      isTyping: !!isTyping,
-      lastSeen: upd.lastSeen ? new Date(upd.lastSeen * 1000) : undefined,
-    };
-    console.log('[Baileys] Parsed presence:', parsed);
-    callback(parsed);
-  });
-}
+    this.sock.ev.on('presence.update', (upd: any) => {
+      console.log('[Baileys] RAW presence.update:', JSON.stringify(upd, null, 2));
 
-onReceiptUpdate(callback: (update: { messageId: string; status: 'delivered' | 'read' }) => void): void {
-  this.sock.ev.on('message-receipt.update', (updates: any[]) => {
-    console.log('[Baileys] RAW receipt event:', JSON.stringify(updates, null, 2));
-    for (const upd of updates) {
-      const key = upd.key?.id;
-      if (!key) continue;
+      const isTyping = upd.presence?.unavailable !== true && upd.presence?.composing;
+      const parsed = {
+        chatId: upd.id,
+        isOnline: upd.presence?.available === true,
+        isTyping: !!isTyping,
+        lastSeen: upd.lastSeen ? new Date(upd.lastSeen * 1000) : undefined,
+      };
 
-      let status: 'delivered' | 'read' | undefined;
-      if (upd.receipt?.readTimestamp) status = 'read';
-      else if (upd.receipt?.deliveryTimestamp) status = 'delivered';
+      console.log('[Baileys] Parsed presence:', parsed);
+      callback(parsed);
+    });
+  }
 
-      if (status) {
-        console.log('[Baileys] Receipt detected:', { messageId: key, status });
-        callback({ messageId: key, status });
+  onReceiptUpdate(callback: (update: { messageId: string; status: 'delivered' | 'read' }) => void): void {
+    this.sock.ev.on('message-receipt.update', (updates: any[]) => {
+      console.log('[Baileys] RAW receipt event:', JSON.stringify(updates, null, 2));
+
+      for (const upd of updates) {
+        const key = upd.key?.id;
+        if (!key) continue;
+
+        let status: 'delivered' | 'read' | undefined;
+        if (upd.receipt?.readTimestamp) status = 'read';
+        else if (upd.receipt?.deliveryTimestamp) status = 'delivered';
+
+        if (status) {
+          console.log('[Baileys] Receipt detected:', { messageId: key, status });
+          callback({ messageId: key, status });
+        }
       }
-    }
-  });
-}
+    });
+  }
 
   async sendTyping(chatId: string, isTyping: boolean): Promise<void> {
     if (!this.sock) return;

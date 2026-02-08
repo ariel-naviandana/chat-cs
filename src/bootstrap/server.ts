@@ -47,27 +47,25 @@ async function startServer() {
 
   setupAgentSocket(io, sendMessageUseCase, messageRepo);
 
-whatsappAdapter.onMessage(async (message) => {
-  console.log('[Server] Incoming message dari:', message.chatId, message.text);
+  whatsappAdapter.onMessage(async (message) => {
+    console.log('[Server] Incoming message dari:', message.chatId, message.text);
 
-  // Subscribe ulang untuk pastikan presence aktif
-  await whatsappAdapter.subscribePresence(message.chatId);
-  console.log('[Server] Re-subscribe presence ke:', message.chatId);
+    await whatsappAdapter.subscribePresence(message.chatId);
 
-  await messageRepo.saveMessage(message);
-  notificationAdapter.notifyNewMessage(message);
-});
+    await messageRepo.saveMessage(message);
+    notificationAdapter.notifyNewMessage(message);
+  });
 
-whatsappAdapter.onPresenceUpdate((update) => {
-  console.log('[Server] Presence update diterima:', update);
-  notificationAdapter.notifyOnlineStatus(update.chatId, update.isOnline, update.lastSeen);
-  notificationAdapter.notifyTyping(update.chatId, update.isTyping);
-});
+  whatsappAdapter.onPresenceUpdate((update) => {
+    console.log('[Server] Presence update:', update);
+    notificationAdapter.notifyOnlineStatus(update.chatId, update.isOnline, update.lastSeen);
+    notificationAdapter.notifyTyping(update.chatId, update.isTyping);
+  });
 
-whatsappAdapter.onReceiptUpdate((update) => {
-  console.log('[Server] Receipt update diterima:', update);
-  notificationAdapter.notifyReceipt(update.messageId, update.status);
-});
+  whatsappAdapter.onReceiptUpdate((update) => {
+    console.log('[Server] Receipt update:', update);
+    notificationAdapter.notifyReceipt(update.messageId, update.status);
+  });
 
   app.post('/api/test-send', async (req, res) => {
     const { chatId, text } = req.body;

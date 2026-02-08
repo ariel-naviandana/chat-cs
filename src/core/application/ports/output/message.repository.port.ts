@@ -5,7 +5,7 @@ export interface MessageRepository {
   saveMessage(message: Message): Promise<void>;
   getMessagesByChat(chatId: string, limit?: number, offset?: number): Promise<Message[]>;
   updateMessageStatus(messageId: string, status: 'delivered' | 'read'): Promise<void>;
-  markChatAsRead(chatId: string): Promise<void>; // optional, untuk reset unread
-  getChats(): Promise<Chat[]>; // untuk list chat di UI CS
+  markChatAsRead(chatId: string): Promise<void>;
+  getChats(): Promise<Chat[]>;
   assignChatToAgent(chatId: string, agentId: string): Promise<void>;
 }
