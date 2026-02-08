@@ -45,42 +45,27 @@ async function startServer() {
     notificationAdapter
   );
 
-  setupAgentSocket(io, sendMessageUseCase);
-
-    // INCOMING MESSAGE dari WhatsApp (customer kirim ke kita)
-  // di server.ts
-const OUR_NUMBER = '6282132102349@s.whatsapp.net'; // ganti dengan nomor kamu
+  setupAgentSocket(io, sendMessageUseCase, messageRepo);
 
 whatsappAdapter.onMessage(async (message) => {
+  console.log('[Server] Incoming message dari:', message.chatId, message.text);
+
+  // Subscribe ulang untuk pastikan presence aktif
+  await whatsappAdapter.subscribePresence(message.chatId);
+  console.log('[Server] Re-subscribe presence ke:', message.chatId);
+
   await messageRepo.saveMessage(message);
-
-  const isFromUs = message.from === OUR_NUMBER || message.from.includes('status@broadcast');
-
-  if (!isFromUs) {
-    io.to('all-agents').emit('newMessage', message);
-  } else {
-    console.log('[Server] Pesan keluar dari kita — tidak dibroadcast');
-  }
+  notificationAdapter.notifyNewMessage(message);
 });
 
-  whatsappAdapter.onPresenceUpdate((update) => {
-    console.log('[Baileys] Presence update:', update);
-    notificationAdapter.notifyOnlineStatus(
-      update.chatId,
-      update.isOnline,
-      update.lastSeen
-    );
-    notificationAdapter.notifyTyping(update.chatId, update.isTyping);
-  });
+whatsappAdapter.onPresenceUpdate((update) => {
+  console.log('[Server] Presence update diterima:', update);
+  notificationAdapter.notifyOnlineStatus(update.chatId, update.isOnline, update.lastSeen);
+  notificationAdapter.notifyTyping(update.chatId, update.isTyping);
+});
 
-  whatsappAdapter.onReceiptUpdate((update) => {
-  console.log('[Server] 📬 Receipt update diterima:', update);
-
-  messageRepo.updateMessageStatus(update.messageId, update.status)
-    .catch(err => console.error('Gagal update status di DB:', err));
-
-  // Pastikan emit ini berjalan
-  console.log('[Server] ➤ Emit receipt ke all-agents:', update.messageId, update.status);
+whatsappAdapter.onReceiptUpdate((update) => {
+  console.log('[Server] Receipt update diterima:', update);
   notificationAdapter.notifyReceipt(update.messageId, update.status);
 });
 

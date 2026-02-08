@@ -8,6 +8,7 @@ const messageSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   chatId: { type: String, required: true, index: true },
   from: { type: String },
+  fromMe: { type: Boolean },
   text: { type: String },
   media: {
     type: { type: String },     // image, video, document, dll.
@@ -47,14 +48,6 @@ export class MongooseMessageRepository implements MessageRepository {
     }
   }
 
-  async getMessagesByChat(chatId: string, limit = 50, offset = 0): Promise<Message[]> {
-    return MessageModel.find({ chatId })
-      .sort({ timestamp: -1 })
-      .skip(offset)
-      .limit(limit)
-      .lean() as Promise<Message[]>;
-  }
-
   async updateMessageStatus(messageId: string, status: 'delivered' | 'read'): Promise<void> {
     await MessageModel.updateOne(
       { id: messageId },
@@ -71,16 +64,29 @@ export class MongooseMessageRepository implements MessageRepository {
   }
 
   async getChats(): Promise<Chat[]> {
-    // Ambil unique chatId dari messages
-    const chatIds = await MessageModel.distinct('chatId');
-    return chatIds.map(id => ({
+  const chatIds = await MessageModel.distinct('chatId');
+  const chats = await Promise.all(chatIds.map(async (id) => {
+    const lastMessage = await MessageModel.findOne({ chatId: id }).sort({ timestamp: -1 });
+    const unreadCount = await MessageModel.countDocuments({ chatId: id, status: { $ne: 'read' } });
+    return {
       id,
       isGroup: id.endsWith('@g.us'),
-      participants: [], // nanti bisa diisi dari Baileys.groupMetadata kalau perlu
-      unreadCount: 0,   // hitung nanti dari query unread
-      assignedAgent: undefined
-    }));
-  }
+      participants: [], // nanti bisa isi dari groupMetadata kalau perlu
+      lastMessage: lastMessage ? lastMessage.toObject() : undefined,
+      unreadCount,
+      assignedAgent: undefined, // kalau sudah ada auth
+    };
+  }));
+  return chats;
+}
+
+async getMessagesByChat(chatId: string, limit = 50, offset = 0): Promise<Message[]> {
+  return MessageModel.find({ chatId })
+    .sort({ timestamp: -1 })
+    .skip(offset)
+    .limit(limit)
+    .lean() as Promise<Message[]>;
+}
 
   async assignChatToAgent(chatId: string, agentId: string): Promise<void> {
     // Untuk sementara log saja, nanti bisa tambah field di schema Chat terpisah

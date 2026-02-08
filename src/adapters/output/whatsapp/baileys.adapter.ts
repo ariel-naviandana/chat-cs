@@ -54,55 +54,65 @@ export class BaileysAdapter implements WhatsappPort {
     });
   }
 
-  onMessage(callback: (message: Message) => Promise<void>): void {
-    this.sock.ev.on('messages.upsert', async (m: any) => {
-      const msg = m.messages[0];
-
-      console.log('[Baileys] messages.upsert event:', {
-        id: msg.key.id,
-        fromMe: msg.key.fromMe,
-        type: m.type,
-        hasMessage: !!msg.message,
-      });
-
-      if (!msg.message || m.type !== 'notify') {
-        console.log('[Baileys] Skip: tidak ada message atau type bukan notify');
-        return;
-      }
-
-      // Filter pesan dari diri sendiri (outgoing)
-      if (msg.key.fromMe) {
-        console.log('[Baileys] Skip: pesan dari kita sendiri (fromMe=true):', msg.key.id);
-        return;
-      }
-
-      let text = '';
-      if (msg.message.conversation) {
-        text = msg.message.conversation;
-      } else if (msg.message.extendedTextMessage?.text) {
-        text = msg.message.extendedTextMessage.text;
-      }
-
-      const parsedMessage: Message = {
-        id: msg.key.id!,
-        chatId: msg.key.remoteJid!,
-        from: msg.key.participant || msg.key.remoteJid!,
-        fromMe: msg.key.fromMe === true,          // ← WAJIB ditambahkan
-        text,
-        status: 'delivered',
-        timestamp: new Date((msg.messageTimestamp || 0) * 1000),
-        isPinned: false,
-      };
-
-      console.log(
-        '[Baileys] ✅ Processing incoming message:',
-        parsedMessage.id,
-        'text:',
-        parsedMessage.text,
-      );
-      await callback(parsedMessage);
-    });
+  async subscribePresence(chatId: string): Promise<void> {
+  if (!this.sock) {
+    console.warn('[Baileys] sock belum siap untuk subscribe presence');
+    return;
   }
+
+  try {
+    await this.sock.presenceSubscribe(chatId);
+    console.log('[Baileys] Berhasil subscribe presence untuk chat:', chatId);
+  } catch (err) {
+    console.error('[Baileys] Gagal subscribe presence untuk', chatId, ':', err);
+  }
+}
+
+  onMessage(callback: (message: Message) => Promise<void>): void {
+  this.sock.ev.on('messages.upsert', async (m: any) => {
+    console.log('[Baileys] RAW messages.upsert:', JSON.stringify(m, null, 2));
+
+    const msg = m.messages?.[0];
+    if (!msg) return;
+
+    let chatId = msg.key.remoteJid;
+
+    // FIX LID: remap ke JID asli kalau dari linked device
+    if (chatId.endsWith('@lid')) {
+      // Ambil JID asli dari alt atau context (Baileys kadang simpan di remoteJidAlt atau participant)
+      chatId = msg.key.remoteJidAlt || msg.key.participant || chatId;
+      console.log('[Baileys] Remap LID → JID asli:', chatId);
+    }
+
+    if (!msg.message || m.type !== 'notify') {
+      console.log('[Baileys] Skip: bukan notify atau tidak ada message');
+      return;
+    }
+
+    if (msg.key.fromMe) {
+      console.log('[Baileys] Skip: pesan outgoing kita sendiri');
+      return;
+    }
+
+    let text = '';
+    if (msg.message.conversation) text = msg.message.conversation;
+    else if (msg.message.extendedTextMessage?.text) text = msg.message.extendedTextMessage.text;
+
+    const parsedMessage: Message = {
+      id: msg.key.id!,
+      chatId,  // ← pakai chatId yang sudah diremap
+      from: msg.key.participant || msg.key.remoteJid!,
+      fromMe: msg.key.fromMe === true,
+      text,
+      status: 'delivered',
+      timestamp: new Date((msg.messageTimestamp || 0) * 1000),
+      isPinned: false,
+    };
+
+    console.log('[Baileys] ✅ Processing incoming (remapped):', parsedMessage);
+    await callback(parsedMessage);
+  });
+}
 
   // Method sendMessage – return object { messageId, timestamp }
   async sendMessage(
@@ -146,45 +156,39 @@ export class BaileysAdapter implements WhatsappPort {
     }
   }
 
-    onReceiptUpdate(callback: (update: { messageId: string; status: 'delivered' | 'read' }) => void): void {
+  onPresenceUpdate(callback: (update: { chatId: string; isOnline: boolean; isTyping: boolean; lastSeen?: Date }) => void): void {
+  this.sock.ev.on('presence.update', (upd: any) => {
+    console.log('[Baileys] RAW presence.update event:', JSON.stringify(upd, null, 2)); // log raw data
+    const isTyping = upd.presence?.unavailable !== true && upd.presence?.composing;
+    const parsed = {
+      chatId: upd.id,
+      isOnline: upd.presence?.available === true,
+      isTyping: !!isTyping,
+      lastSeen: upd.lastSeen ? new Date(upd.lastSeen * 1000) : undefined,
+    };
+    console.log('[Baileys] Parsed presence:', parsed);
+    callback(parsed);
+  });
+}
+
+onReceiptUpdate(callback: (update: { messageId: string; status: 'delivered' | 'read' }) => void): void {
   this.sock.ev.on('message-receipt.update', (updates: any[]) => {
-    console.log('[Baileys] 🔔 message-receipt.update EVENT MASUK !');
-    console.log('[Baileys] Jumlah update:', updates.length);
-    console.log('[Baileys] Raw updates:', JSON.stringify(updates, null, 2));
-
+    console.log('[Baileys] RAW receipt event:', JSON.stringify(updates, null, 2));
     for (const upd of updates) {
-      console.log('[Baileys] Processing receipt untuk ID:', upd.key?.id);
+      const key = upd.key?.id;
+      if (!key) continue;
 
-      if (upd.receipt?.readTimestamp) {
-        console.log('[Baileys] ✅ READ receipt diterima untuk:', upd.key.id);
-        callback({
-          messageId: upd.key.id!,
-          status: 'read',
-        });
-      } else if (upd.receipt?.deliveryTimestamp) {
-        console.log('[Baileys] ✅ DELIVERED receipt diterima untuk:', upd.key.id);
-        callback({
-          messageId: upd.key.id!,
-          status: 'delivered',
-        });
-      } else {
-        console.log('[Baileys] ⚠️ Receipt tanpa delivery/read timestamp:', JSON.stringify(upd, null, 2));
+      let status: 'delivered' | 'read' | undefined;
+      if (upd.receipt?.readTimestamp) status = 'read';
+      else if (upd.receipt?.deliveryTimestamp) status = 'delivered';
+
+      if (status) {
+        console.log('[Baileys] Receipt detected:', { messageId: key, status });
+        callback({ messageId: key, status });
       }
     }
   });
 }
-
-  onPresenceUpdate(callback: (update: { chatId: string; isOnline: boolean; isTyping: boolean; lastSeen?: Date }) => void): void {
-    this.sock.ev.on('presence.update', (upd: any) => {
-      const isTyping = upd.presence?.unavailable !== true && upd.presence?.composing;
-      callback({
-        chatId: upd.id,
-        isOnline: upd.presence?.available === true,
-        isTyping: !!isTyping,
-        lastSeen: upd.lastSeen ? new Date(upd.lastSeen * 1000) : undefined,
-      });
-    });
-  }
 
   async sendTyping(chatId: string, isTyping: boolean): Promise<void> {
     if (!this.sock) return;

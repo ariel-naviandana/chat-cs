@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>CS Chat Test - Mirip WhatsApp Web</title>
+  <title>CS Chat Test</title>
 
   <style>
     :root{
@@ -15,6 +15,7 @@
       --delivered:#53bdeb;
       --read:#4fc3f7;
       --input-height:68px;
+      --sidebar-width:320px;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
@@ -22,30 +23,73 @@
       font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;
       margin:0;
       display:flex;
-      flex-direction:column;
       height:100vh;
       background:var(--bg);
       -webkit-font-smoothing:antialiased;
     }
 
+    .sidebar{
+      width:var(--sidebar-width);
+      background:#f0f2f5;
+      border-right:1px solid #ddd;
+      overflow-y:auto;
+      padding:16px;
+      display:flex;
+      flex-direction:column;
+    }
+    .sidebar h3{
+      margin:0 0 12px;
+      font-size:18px;
+      color:#111;
+    }
+    .chat-item{
+      padding:12px 16px;
+      border-radius:8px;
+      cursor:pointer;
+      margin-bottom:4px;
+      transition:background 0.2s;
+    }
+    .chat-item:hover,
+    .chat-item.active{
+      background:#e0f2f1;
+    }
+    .chat-item .title{
+      font-weight:500;
+      font-size:15px;
+    }
+    .chat-item .preview{
+      font-size:13px;
+      color:#555;
+      margin-top:4px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .main-chat{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+    }
+
     header{
       background:var(--accent);
       color:#fff;
-      padding:10px 14px;
+      padding:12px 16px;
       display:flex;
       gap:12px;
       align-items:center;
-      box-shadow:0 1px 0 rgba(0,0,0,0.06);
+      box-shadow:0 1px 3px rgba(0,0,0,0.1);
     }
     .avatar{
       width:44px;height:44px;border-radius:50%;
-      background:rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.2);
       display:flex;align-items:center;justify-content:center;
-      font-weight:700;font-size:18px;color:#fff;
+      font-weight:700;font-size:18px;
     }
     .header-info{display:flex;flex-direction:column}
-    .header-title{font-weight:700;font-size:16px}
-    .header-status{font-size:13px;opacity:0.95;color:#e6f6f2;margin-top:2px}
+    .header-title{font-weight:600;font-size:17px}
+    .header-status{font-size:13px;opacity:0.9;margin-top:2px}
 
     .chat-container{
       flex:1;
@@ -62,21 +106,21 @@
     }
 
     #typingStatus{
-      font-size:13px;color:#333;padding:6px 10px;
+      font-size:13px;color:#333;padding:6px 12px;
       background:rgba(255,255,255,0.9);border-radius:10px;align-self:center;
-      margin-bottom:6px;min-height:20px;display:inline-block;
+      margin:8px 0;min-height:20px;display:inline-block;
       box-shadow:0 1px 1px rgba(0,0,0,0.04);
     }
 
     .message{
-      max-width:78%;padding:10px 12px;border-radius:12px;position:relative;
+      max-width:78%;padding:10px 14px;border-radius:12px;position:relative;
       word-wrap:break-word;font-size:14.2px;line-height:19px;display:inline-block;
       box-shadow:0 1px 0 rgba(0,0,0,0.04);
     }
     .sent{background:var(--bubble-sent);align-self:flex-end;margin-left:auto;border-bottom-right-radius:4px}
     .received{background:var(--bubble-recv);align-self:flex-start;margin-right:auto;border-bottom-left-radius:4px}
 
-    .meta{display:flex;gap:6px;align-items:center;justify-content:flex-end;margin-top:8px;font-size:11px;color:var(--muted)}
+    .meta{display:flex;gap:6px;align-items:center;justify-content:flex-end;margin-top:4px;font-size:11px;color:var(--muted)}
     .meta .time{opacity:0.95}
     .tick{display:inline-flex;align-items:center;justify-content:center;min-width:18px;margin-left:6px;font-size:12px;line-height:1}
     .tick-sent{color:var(--muted)}
@@ -84,302 +128,332 @@
     .tick-read{color:var(--read)}
 
     .input-area{
-      position:fixed;left:0;right:0;bottom:0;height:var(--input-height);
+      height:var(--input-height);
       background:rgba(255,255,255,0.98);padding:10px;display:flex;align-items:center;gap:8px;
-      border-top:1px solid #e6e6e6;box-shadow:0 -6px 18px rgba(0,0,0,0.04);
+      border-top:1px solid #e6e6e6;box-shadow:0 -2px 8px rgba(0,0,0,0.04);
     }
-    .input-area .fields{display:flex;gap:8px;align-items:center;flex:1}
-    input[type="text"], input#chatId{
-      height:44px;padding:10px 14px;border-radius:22px;border:1px solid #ddd;outline:none;font-size:15px;background:#fff;width: 100%;
+    .input-area input{
+      flex:1;height:44px;padding:10px 16px;border-radius:22px;border:1px solid #ddd;outline:none;font-size:15px;
     }
     button{
-      background:var(--accent);color:#fff;border:none;padding:10px 16px;border-radius:22px;cursor:pointer;font-weight:700;height:44px;min-width:84px;
-      display:inline-flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(7,94,84,0.16);
+      background:var(--accent);color:#fff;border:none;padding:0 20px;border-radius:22px;cursor:pointer;font-weight:600;height:44px;
+    }
+    .unread-badge {
+      background: #25d366;
+      color: white;
+      border-radius: 50%;
+      padding: 2px 6px;
+      font-size: 11px;
+      margin-left: 8px;
+      display: inline-block;
     }
 
-    @media(max-width:600px){
-      .message{max-width:86%}
-      .avatar{width:40px;height:40px;font-size:16px}
-      input[type="text"],input#chatId{height:40px}
+    @media(max-width:768px){
+      .sidebar{width:260px}
+      .message{max-width:82%}
     }
   </style>
 </head>
 <body>
 
-  <header>
-    <div class="avatar">CS</div>
-    <div class="header-info">
-      <div class="header-title">Customer Service Test</div>
-      <div class="header-status" id="presenceStatus">Menunggu status...</div>
-    </div>
-  </header>
-
-  <div class="chat-container" id="chatContainer">
-    <div id="typingStatus"></div>
-    <!-- pesan akan ditambahkan di sini -->
+  <div class="sidebar">
+    <h3>Chats</h3>
+    <div id="chatList"></div>
   </div>
 
-  <div class="input-area">
-    <div class="fields">
-      <input id="chatId" type="text" placeholder="Chat ID (628xxx@s.whatsapp.net)" value="6289617349913@s.whatsapp.net" />
-      <input id="text" type="text" placeholder="Ketik pesan..." autocomplete="off" />
+  <div class="main-chat">
+    <header>
+      <div class="avatar">CS</div>
+      <div class="header-info">
+        <div class="header-title" id="currentChatTitle">Customer Service Test</div>
+        <div class="header-status" id="presenceStatus">Menunggu status...</div>
+      </div>
+    </header>
+
+    <div class="chat-container" id="chatContainer">
+      <div id="typingStatus"></div>
+      <!-- pesan akan ditambahkan di sini -->
     </div>
-    <button id="sendBtn">Kirim</button>
+
+    <div class="input-area">
+      <input id="text" type="text" placeholder="Ketik pesan..." autocomplete="off" />
+      <button id="sendBtn">Kirim</button>
+    </div>
   </div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script>
-    const socket = io('http://localhost:3000', {
-      path: '/socket.io/',
-      transports: ['polling','websocket'],
-      reconnection: true,
-      timeout: 10000
-    });
-
-    const chatContainer = document.getElementById('chatContainer');
-    const typingStatus = document.getElementById('typingStatus');
-    const presenceStatus = document.getElementById('presenceStatus');
-    const textInput = document.getElementById('text');
-    const chatIdInput = document.getElementById('chatId');
-    const sendBtn = document.getElementById('sendBtn');
-
-    // Tracking yang lebih ketat
-    const displayedMessageIds = new Set();  // REAL message IDs yang sudah ditampilkan
-    const pendingTempIds = new Map();       // tempId -> { promise, resolve, reject }
-
-    function log(...args){ console.debug('[client]', ...args) }
-
-    textInput.focus();
-
-    textInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); kirimPesan(); }
-    });
-    sendBtn.addEventListener('click', kirimPesan);
-
-    socket.on('connect', () => {
-      presenceStatus.innerHTML = 'Terhubung ke server';
-      log('connected', socket.id);
-    });
-
-    socket.on('connect_error', (err) => {
-      presenceStatus.innerHTML = 'Gagal terhubung: ' + (err?.message || err);
-      console.error('connect_error', err);
-    });
-
-// HANYA SATU listener untuk 'newMessage'
-socket.on('newMessage', (msg) => {
-  if (!msg || !msg.id) return;
-
-  log('[newMessage received]', msg.id, msg.from, msg.text.substring(0,30));
-
-  // Jika ini pesan yang KITA KIRIM SENDIRI → skip penambahan baru
-  // karena sudah ditampilkan sebagai optimistic UI
-  if (msg.from === 'agent') {
-    log(`[newMessage] Skip adding — ini pesan outgoing kita sendiri (${msg.id})`);
-    
-    // Tapi tetap update status jika perlu
-    if (displayedMessageIds.has(msg.id)) {
-      updateStatusBubble(msg.id, msg.status);
-    }
-    return;
-  }
-
-  // Pesan masuk (dari customer)
-  if (displayedMessageIds.has(msg.id)) {
-    log(`[newMessage] Skip — sudah ada di UI: ${msg.id}`);
-    updateStatusBubble(msg.id, msg.status);
-    return;
-  }
-
-  log(`[newMessage] Menambahkan pesan masuk baru: ${msg.id}`);
-  tambahPesanKeUI(msg);
-  displayedMessageIds.add(msg.id);
-  scrollKeBawah();
-});
-
-// Listener messageAck tetap (untuk mengganti tempId → real id)
-socket.on('messageAck', (data) => {
-  if (!data?.tempId || !data?.message?.id) return;
-
-  log(`[messageAck] ${data.tempId} → ${data.message.id}`);
-
-  const tempBubble = document.querySelector(`[data-id="${data.tempId}"]`);
-  if (!tempBubble) {
-    log(`[messageAck] Temp bubble tidak ditemukan: ${data.tempId}`);
-    // Optional: tambahPesanKeUI(data.message) sebagai fallback
-    return;
-  }
-
-  // Ganti id
-  tempBubble.setAttribute('data-id', data.message.id);
-
-  // Update waktu & status tick
-  const wrapper = tempBubble.parentElement;
-  const meta = wrapper?.querySelector('.meta');
-  if (meta) {
-    const timeEl = meta.querySelector('.time');
-    if (timeEl && data.message.timestamp) {
-      timeEl.innerText = new Date(data.message.timestamp).toLocaleTimeString('id-ID', {
-        hour: '2-digit', minute: '2-digit'
-      });
-    }
-
-    const tickEl = meta.querySelector('.tick');
-    if (tickEl) {
-      if (data.message.status === 'delivered') {
-        tickEl.innerText = '✓✓';
-        tickEl.className = 'tick tick-delivered';
-      } else if (data.message.status === 'read') {
-        tickEl.innerText = '✓✓';
-        tickEl.className = 'tick tick-read';
-      }
-    }
-  }
-
-  // Catat real id
-  displayedMessageIds.add(data.message.id);
-  // Optional: hapus tempId dari set jika ada
-  // displayedMessageIds.delete(data.tempId); // tergantung kebutuhan
-});
-
-    socket.on('typing', (data) => {
-      typingStatus.innerHTML = data?.isTyping ? 'Sedang mengetik...' : '';
-      if (data?.isTyping){
-        clearTimeout(window._typingTimeout);
-        window._typingTimeout = setTimeout(() => {
-          typingStatus.innerHTML = '';
-        }, 3500);
-      }
-    });
-
-    socket.on('presence', (data) => {
-      let text = data?.isOnline ? 'Online' : 'Offline';
-      if (!data?.isOnline && data?.lastSeen) {
-        text += ` • Terakhir dilihat: ${new Date(data.lastSeen).toLocaleString('id-ID')}`;
-      }
-      presenceStatus.innerHTML = text;
-    });
-
-    socket.on('receipt', (data) => {
-  log('===== RECEIPT EVENT DITERIMA =====');
-  log('Data receipt:', data);
-
-  if (!data?.messageId) {
-    log('Receipt tanpa messageId, skip');
-    return;
-  }
-
-  log(`Mencoba update status pesan ${data.messageId} → ${data.status}`);
-
-  updateStatusBubble(data.messageId, data.status);
-});
-
-        function kirimPesan() {
-  const chatId = chatIdInput.value.trim();
-  const text = textInput.value.trim();
-  if (!chatId || !text) return alert('Isi chatId dan pesan!');
-
-  const tempId = 'temp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
-
-  // Tampilkan dulu (optimistic)
-  tambahPesanKeUI({
-    id: tempId,
-    chatId,
-    from: 'agent',
-    text,
-    status: 'sent',
-    timestamp: new Date().toISOString()
+  const socket = io('http://localhost:3000', {
+    path: '/socket.io/',
+    transports: ['polling','websocket'],
+    reconnection: true,
+    timeout: 10000
   });
 
-  displayedMessageIds.add(tempId);   // catat tempId supaya tidak di-duplikat
+  const chatContainer = document.getElementById('chatContainer');
+  const typingStatus = document.getElementById('typingStatus');
+  const presenceStatus = document.getElementById('presenceStatus');
+  const currentChatTitle = document.getElementById('currentChatTitle');
+  const textInput = document.getElementById('text');
+  const sendBtn = document.getElementById('sendBtn');
+  const chatList = document.getElementById('chatList');
 
-  // Kirim ke server
-  socket.emit('sendMessage', { chatId, text, tempId });
+  let currentChatId = null;
+  const displayedMessageIds = new Set();
 
-  textInput.value = '';
+  function log(...args) { console.debug('[UI]', ...args) }
+
   textInput.focus();
-  scrollKeBawah();
-}
-    function tambahPesanKeUI(msg){
-      const isSent = msg.from === 'agent';
-      const wrapper = document.createElement('div');
-      wrapper.style.display = 'flex';
-      wrapper.style.flexDirection = 'column';
-      wrapper.style.alignItems = isSent ? 'flex-end' : 'flex-start';
+  textInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); kirimPesan(); }
+  });
+  sendBtn.addEventListener('click', kirimPesan);
 
-      const bubble = document.createElement('div');
-      bubble.className = `message ${isSent ? 'sent' : 'received'}`;
-      bubble.setAttribute('data-id', msg.id);
-      bubble.innerText = msg.text || '[Pesan lain]';
+  socket.on('connect', () => {
+    presenceStatus.innerHTML = 'Terhubung ke server';
+    log('connected', socket.id);
+    socket.emit('loadChats');
+  });
 
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      const time = document.createElement('div');
-      time.className = 'time';
-      const ts = msg.timestamp ? new Date(msg.timestamp) : new Date();
-      time.innerText = ts.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-      meta.appendChild(time);
+  socket.on('connect_error', (err) => {
+    presenceStatus.innerHTML = 'Gagal terhubung: ' + (err?.message || err);
+    log('connect_error', err);
+  });
 
-      if (isSent){
-        const tick = document.createElement('div');
-        tick.className = 'tick tick-sent';
-        if (msg.status === 'sent') { 
-          tick.innerText = '✓'; 
-          tick.className = 'tick tick-sent';
-        } else if (msg.status === 'delivered') { 
-          tick.innerText = '✓✓'; 
-          tick.className = 'tick tick-delivered';
-        } else if (msg.status === 'read') { 
-          tick.innerText = '✓✓'; 
-          tick.className = 'tick tick-read';
+  // Terima list chat
+  socket.on('chatsList', (chats) => {
+    log('chatsList received', chats.length);
+    chatList.innerHTML = '';
+    if (chats.error) {
+      chatList.innerHTML = `<p>Error: ${chats.error}</p>`;
+      return;
+    }
+
+    // Urutkan chat berdasarkan timestamp terbaru
+    chats.sort((a, b) => {
+      const ta = a.lastMessage?.timestamp ? new Date(a.lastMessage.timestamp).getTime() : 0;
+      const tb = b.lastMessage?.timestamp ? new Date(b.lastMessage.timestamp).getTime() : 0;
+      return tb - ta;
+    });
+
+    chats.forEach(chat => {
+      const li = document.createElement('div');
+      li.className = 'chat-item';
+      li.dataset.chatid = chat.id;
+      li.innerHTML = `
+        <div class="title">${chat.id}</div>
+        <div class="preview">${chat.lastMessage?.text?.substring(0,40) || 'No messages'} ${chat.unreadCount > 0 ? `(${chat.unreadCount})` : ''}</div>
+      `;
+      li.onclick = () => {
+        currentChatId = chat.id;
+        currentChatTitle.innerHTML = chat.id;
+        document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
+        li.classList.add('active');
+        loadHistory(chat.id);
+      };
+      chatList.appendChild(li);
+    });
+
+    // Auto load chat terbaru kalau belum ada chat aktif
+    if (chats.length > 0 && !currentChatId) {
+      const latest = chats[0];
+      currentChatId = latest.id;
+      currentChatTitle.innerHTML = latest.id;
+      document.querySelector('.chat-item')?.classList.add('active');
+      loadHistory(latest.id);
+    }
+  });
+
+  function loadHistory(chatId) {
+    chatContainer.innerHTML = '<div id="typingStatus"></div>';
+    displayedMessageIds.clear();
+    socket.emit('loadChatHistory', { chatId, limit: 50, offset: 0 });
+  }
+
+  socket.on('chatHistory', (data) => {
+    log('chatHistory received for', data.chatId, 'count:', data.messages.length);
+    if (data.error) {
+      chatContainer.innerHTML += `<p>Error: ${data.error}</p>`;
+      return;
+    }
+    data.messages.reverse().forEach(msg => {
+      tambahPesanKeUI(msg);
+      displayedMessageIds.add(msg.id);
+    });
+    scrollKeBawah();
+  });
+
+  // Real-time pesan baru
+  socket.on('newMessage', (msg) => {
+    log('[newMessage] received:', msg.id, msg.chatId, msg.text?.substring(0,30) || '[no text]');
+
+    if (!msg || !msg.chatId || !msg.id) return;
+
+    // Highlight sidebar kalau pesan baru di chat lain
+    const li = [...document.querySelectorAll('.chat-item')].find(el => el.dataset.chatid === msg.chatId);
+    if (li && msg.chatId !== currentChatId) {
+      let badge = li.querySelector('.unread-badge');
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'unread-badge';
+        badge.style.background = '#25d366';
+        badge.style.color = 'white';
+        badge.style.borderRadius = '50%';
+        badge.style.padding = '2px 6px';
+        badge.style.fontSize = '11px';
+        badge.style.marginLeft = '8px';
+        li.querySelector('.title').appendChild(badge);
+      }
+      const count = parseInt(badge.innerText || '0') + 1;
+      badge.innerText = count;
+    }
+
+    // Append kalau chat aktif
+    if (currentChatId && msg.chatId === currentChatId) {
+      if (displayedMessageIds.has(msg.id)) return;
+      tambahPesanKeUI(msg);
+      displayedMessageIds.add(msg.id);
+      scrollKeBawah();
+    } else {
+      log('[newMessage] skipped — bukan chat aktif');
+    }
+  });
+
+  // messageAck untuk update tempId & status
+  socket.on('messageAck', (data) => {
+    if (!data?.tempId || !data?.message?.id) return;
+    log('[messageAck]', data.tempId, '→', data.message.id);
+
+    const tempBubble = document.querySelector(`[data-id="${data.tempId}"]`);
+    if (tempBubble) {
+      tempBubble.setAttribute('data-id', data.message.id);
+      const meta = tempBubble.parentElement.querySelector('.meta');
+      if (meta) {
+        const timeEl = meta.querySelector('.time');
+        if (timeEl && data.message.timestamp) {
+          timeEl.innerText = new Date(data.message.timestamp).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
         }
-        meta.appendChild(tick);
+        const tickEl = meta.querySelector('.tick');
+        if (tickEl) {
+          tickEl.innerText = '✓';
+          tickEl.className = 'tick tick-sent';
+        }
       }
+      displayedMessageIds.add(data.message.id);
+    }
+  });
 
-      wrapper.appendChild(bubble);
-      wrapper.appendChild(meta);
-      chatContainer.appendChild(wrapper);
+  socket.on('presence', (data) => {
+    log('[UI] Presence event:', data);
+    let text = data?.isOnline ? 'Online' : 'Offline';
+    if (!data?.isOnline && data?.lastSeen) {
+      text += ` • Terakhir dilihat: ${new Date(data.lastSeen).toLocaleString('id-ID')}`;
+    }
+    presenceStatus.innerHTML = text;
+  });
+
+  socket.on('typing', (data) => {
+    log('[UI] Typing event:', data);
+    typingStatus.innerHTML = data?.isTyping ? 'Sedang mengetik...' : '';
+    if (data?.isTyping) {
+      clearTimeout(window._typingTimeout);
+      window._typingTimeout = setTimeout(() => typingStatus.innerHTML = '', 4000);
+    }
+  });
+
+  socket.on('receipt', (data) => {
+    log('[UI] Receipt event:', data);
+    updateStatusBubble(data.messageId, data.status);
+  });
+
+  function kirimPesan() {
+    if (!currentChatId) {
+      alert('Pilih salah satu chat di sidebar terlebih dahulu!');
+      return;
     }
 
-    function updateStatusBubble(messageId, status){
-      const bubble = document.querySelector(`[data-id="${messageId}"]`);
-      if (!bubble) {
-        log(`updateStatusBubble: bubble ${messageId} tidak ditemukan`);
-        return;
-      }
-      updateMetaForBubble(bubble, status);
+    const text = textInput.value.trim();
+    if (!text) {
+      alert('Ketik pesan terlebih dahulu!');
+      return;
     }
 
-    function updateMetaForBubble(bubble, status){
-      const meta = bubble.parentElement.querySelector('.meta');
-      if (!meta) return;
-      const tickEl = meta.querySelector('.tick');
-      if (!tickEl) return;
-      if (status === 'delivered') { 
-        tickEl.innerText = '✓✓'; 
-        tickEl.className = 'tick tick-delivered';
-      } else if (status === 'read') { 
-        tickEl.innerText = '✓✓'; 
-        tickEl.className = 'tick tick-read';
-      } else { 
-        tickEl.innerText = '✓'; 
-        tickEl.className = 'tick tick-sent';
-      }
+    const tempId = 'temp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+
+    tambahPesanKeUI({
+  id: tempId,
+  chatId: currentChatId,
+  fromMe: true,  // ← tambahkan ini supaya konsisten
+  text,
+  status: 'sent',
+  timestamp: new Date().toISOString()
+});
+
+    displayedMessageIds.add(tempId);
+
+    socket.emit('sendMessage', { chatId: currentChatId, text, tempId });
+
+    textInput.value = '';
+    textInput.focus();
+    scrollKeBawah();
+  }
+
+  function tambahPesanKeUI(msg){
+  const isSent = msg.fromMe === true;  // ← pakai ini, bukan msg.from === 'agent'
+
+  const wrapper = document.createElement('div');
+  wrapper.style.display = 'flex';
+  wrapper.style.flexDirection = 'column';
+  wrapper.style.alignItems = isSent ? 'flex-end' : 'flex-start';
+
+  const bubble = document.createElement('div');
+  bubble.className = `message ${isSent ? 'sent' : 'received'}`;
+  bubble.setAttribute('data-id', msg.id);
+  bubble.innerText = msg.text || '[Pesan lain]';
+
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  const time = document.createElement('div');
+  time.className = 'time';
+  const ts = msg.timestamp ? new Date(msg.timestamp) : new Date();
+  time.innerText = ts.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  meta.appendChild(time);
+
+  if (isSent){
+    const tick = document.createElement('div');
+    tick.className = 'tick tick-sent';
+    tick.innerText = '✓';
+    meta.appendChild(tick);
+  }
+
+  wrapper.appendChild(bubble);
+  wrapper.appendChild(meta);
+  chatContainer.appendChild(wrapper);
+}
+  function updateStatusBubble(messageId, status){
+    const bubble = document.querySelector(`[data-id="${messageId}"]`);
+    if (!bubble) return;
+    const meta = bubble.parentElement.querySelector('.meta');
+    if (!meta) return;
+    const tickEl = meta.querySelector('.tick');
+    if (!tickEl) return;
+    if (status === 'delivered') { 
+      tickEl.innerText = '✓✓'; 
+      tickEl.className = 'tick tick-delivered';
+    } else if (status === 'read') { 
+      tickEl.innerText = '✓✓'; 
+      tickEl.className = 'tick tick-read';
+    } else { 
+      tickEl.innerText = '✓'; 
+      tickEl.className = 'tick tick-sent';
     }
+  }
 
-    function scrollKeBawah(){ 
-      chatContainer.scrollTop = chatContainer.scrollHeight; 
-    }
+  function scrollKeBawah(){ 
+    chatContainer.scrollTop = chatContainer.scrollHeight; 
+  }
 
-    window.addEventListener('resize', ()=>{ 
-      setTimeout(scrollKeBawah, 100); 
-    });
-
-    ['connect','disconnect','reconnect','reconnect_attempt'].forEach(e=>{
-      socket.on(e,(...a)=>log('socket event',e,...a));
-    });
-
-  </script>
+  window.addEventListener('resize', ()=>{ setTimeout(scrollKeBawah, 100); });
+</script>
 </body>
 </html>

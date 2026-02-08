@@ -20,4 +20,6 @@ export interface WhatsappPort {
 
   // Query
   getChat(chatId: string): Promise<Chat | null>;
+
+  subscribePresence(chatId: string): Promise<void>;
 }
